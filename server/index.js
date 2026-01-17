@@ -11,8 +11,10 @@ import cors from 'cors';           // Cross-Origin Resource Sharing
 import dotenv from 'dotenv';       // Environment variable manager
 import uploadRoutes from './routes/upload.js';
 import { askQuestion } from './services/chatService.js';
+import connectDB from './config/db.js';
 // 2. Load environment variables from our .env file
 dotenv.config();
+connectDB();
 
 // 3. Initialize the Express Application
 const app = express();
