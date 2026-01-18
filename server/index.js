@@ -12,6 +12,7 @@ import dotenv from 'dotenv';       // Environment variable manager
 import uploadRoutes from './routes/upload.js';
 import { askQuestion } from './services/chatService.js';
 import connectDB from './config/db.js';
+import userRoutes from './routes/userRoutes.js';
 // 2. Load environment variables from our .env file
 dotenv.config();
 connectDB();
@@ -27,7 +28,7 @@ app.use(cors());          // Allows our React frontend (port 5173) to talk to th
 app.use(express.json());  // Automatically parses incoming JSON data into JavaScript objects
 
 app.use('/api/upload', uploadRoutes);
-
+app.use('/api/users', userRoutes);
 /**
  * 5. Server Initialization
  * We use app.listen() to start the server. It returns the "HTTP Server" object
