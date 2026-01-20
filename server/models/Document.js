@@ -1,13 +1,17 @@
 import mongoose from 'mongoose';
 
 const documentSchema = new mongoose.Schema({
-    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    userId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        required: true 
+    },
     fileName: { type: String, required: true },
-    filePath: { type: String, required: true }, // Path to the PDF in your /uploads folder
-    fileSize: { type: Number },
+    fileUrl: { type: String, required: true }, // URL from Firebase Storage
+    pineconeNamespace: { type: String, required: true }, // For RAG isolation
     uploadDate: { type: Date, default: Date.now },
-    // We store the Pinecone 'namespace' here so we know where to search
-    vectorNamespace: { type: String, required: true } 
+    fileSize: Number,
+    summary: String // We can store a mini-summary generated later
 });
 
 export default mongoose.model('Document', documentSchema);
