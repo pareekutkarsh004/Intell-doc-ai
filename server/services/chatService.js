@@ -34,7 +34,7 @@ export const askQuestion = async (question, socket) => {
             context = "No research papers found in the library yet.";
         }
 
-        // 2. Format the messages strictly for Gemini
+        // 2. Format the messages strictly for Gemini (Safe from "Author: undefined" error)
         const messages = [
             new SystemMessage(`You are an expert Research Assistant. 
             Context from papers: ${context}`),
@@ -53,7 +53,6 @@ export const askQuestion = async (question, socket) => {
         socket.emit('ai-response-end');
 
     } catch (error) {
-        // This is what triggers your "AI processing error" in the console
         console.error("❌ Actual Backend Error:", error); 
         socket.emit('error', { message: `AI Error: ${error.message}` });
     }
