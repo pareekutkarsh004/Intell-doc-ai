@@ -20,7 +20,7 @@ export const askQuestion = async (question, socket) => {
         // 1. Connect to our existing "Memory" in Pinecone
         const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
             pineconeIndex,
-            namespace: "chemistry-research",
+            namespace: data.userId,
         });
 
         // 2. Search for the top 3 most relevant chunks in the PDF

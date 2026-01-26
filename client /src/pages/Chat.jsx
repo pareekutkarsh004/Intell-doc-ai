@@ -25,23 +25,17 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+// UPDATED: Import the live socket hook
+import { useSocketChat } from "../hooks/useSocketChat.js";
+
 const Chat = () => {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
   
-  // Removed <Message[]> type annotation
-  const [messages, setMessages] = useState([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Hello! I'm your IntelliDoc AI assistant. I can help you analyze your research papers, extract data, and answer questions with citations. What would you like to know?",
-      timestamp: new Date(),
-    },
-  ]);
+  // UPDATED: Use the socket hook for live data
+  const { messages, sendMessage, isTyping } = useSocketChat();
   
-  // Removed <HTMLDivElement> type annotation
   const messagesEndRef = useRef(null);
 
   const sidebarItems = [
@@ -64,36 +58,20 @@ const Chat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!inputValue.trim()) return;
+  // UPDATED: handleSend now ensures we pass an OBJECT to match the backend expectation
+  const handleSend = () => {
+    const trimmedInput = inputValue.trim();
+    if (!trimmedInput || isTyping) return;
 
-    // Removed Message type annotation
-    const userMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: inputValue,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    // Send the question as a string. 
+    // Note: If your useSocketChat hook doesn't wrap this in { text: val }, 
+    // you might need to change this to sendMessage({ text: trimmedInput });
+    sendMessage(trimmedInput);
+    
+    // Clear the input
     setInputValue("");
-    setIsTyping(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Based on your uploaded research papers, I found relevant information regarding "${inputValue}".\n\nThe catalytic conversion process shows a 95.2% efficiency rate at 350°C, with the primary reaction products being ethylene (42.3%) and propylene (31.7%). This data is consistent with findings from Chen et al. (2024) in their thermodynamic analysis.\n\nKey parameters extracted:\n• Temperature: 350°C\n• Pressure: 2.5 MPa\n• Catalyst loading: 15 wt%\n• Conversion rate: 95.2%`,
-        timestamp: new Date(),
-        citations: ["Chen et al., 2024, J. Chem. Eng., p.145-152", "Smith & Johnson, 2023, AIChE Journal, p.789-801"],
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-      setIsTyping(false);
-    }, 2000);
   };
 
-  // Removed React.KeyboardEvent type annotation
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -166,7 +144,7 @@ const Chat = () => {
               <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
             </Button>
             <div className="w-9 h-9 rounded-full gradient-bg flex items-center justify-center text-white font-semibold">
-              JD
+              UP
             </div>
           </div>
         </header>
@@ -175,14 +153,14 @@ const Chat = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           <ScrollArea className="flex-1 p-6">
             <div className="max-w-3xl mx-auto space-y-6">
-              {messages.map((message) => (
+              {messages.map((message, index) => (
                 <div
-                  key={message.id}
+                  key={index}
                   className={`flex gap-4 ${
                     message.role === "user" ? "justify-end" : ""
                   }`}
                 >
-                  {message.role === "assistant" && (
+                  {message.role === "ai" && (
                     <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shrink-0">
                       <Bot className="w-5 h-5 text-white" />
                     </div>
@@ -195,6 +173,7 @@ const Chat = () => {
                     }`}
                   >
                     <p className="whitespace-pre-wrap">{message.content}</p>
+                    
                     {message.citations && message.citations.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-border">
                         <p className="text-xs font-semibold text-muted-foreground mb-2">
@@ -212,7 +191,8 @@ const Chat = () => {
                         </ul>
                       </div>
                     )}
-                    {message.role === "assistant" && (
+                    
+                    {message.role === "ai" && (
                       <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
                         <Button variant="ghost" size="sm" className="h-8 text-xs">
                           <Copy className="w-3 h-3 mr-1" /> Copy
@@ -236,6 +216,7 @@ const Chat = () => {
                   )}
                 </div>
               ))}
+              
               {isTyping && (
                 <div className="flex gap-4">
                   <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shrink-0">
@@ -244,7 +225,7 @@ const Chat = () => {
                   <div className="bg-card border border-border rounded-2xl rounded-tl-md p-4">
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-                      <span className="text-muted-foreground">Analyzing your papers...</span>
+                      <span className="text-muted-foreground">Streaming analysis...</span>
                     </div>
                   </div>
                 </div>
@@ -254,7 +235,7 @@ const Chat = () => {
           </ScrollArea>
 
           {/* Suggested Questions */}
-          {messages.length === 1 && (
+          {messages.length <= 1 && (
             <div className="px-6 pb-4">
               <div className="max-w-3xl mx-auto">
                 <p className="text-sm text-muted-foreground mb-3">Suggested questions:</p>
