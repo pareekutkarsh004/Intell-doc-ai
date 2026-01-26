@@ -1,58 +1,60 @@
 /**
  * CHAT SERVICE
- * Handles the RAG query process: Search Pinecone -> Ask Gemini -> Stream to User
+ * Handles the RAG query process with safety checks.
  */
 
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { PineconeStore } from "@langchain/pinecone";
-import { embeddings } from "./ragService.js"; // Reuse the same embedding model
+import { HumanMessage, SystemMessage } from "@langchain/core/messages"; 
+import { embeddings } from "./ragService.js"; 
 import { pineconeIndex } from "../config/pinecone.js";
 
-// Initialize the Chat Model
 const model = new ChatGoogleGenerativeAI({
     model: "gemini-1.5-flash",
     apiKey: process.env.GOOGLE_API_KEY,
-    streaming: true, // Crucial for word-by-word response
+    streaming: true,
 });
 
 export const askQuestion = async (question, socket) => {
     try {
-        // 1. Connect to our existing "Memory" in Pinecone
-        const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
-            pineconeIndex,
-            namespace: data.userId,
-        });
+        const cleanQuestion = String(question);
+        let context = "";
 
-        // 2. Search for the top 3 most relevant chunks in the PDF
-        const relevantDocs = await vectorStore.similaritySearch(question, 3);
-        
-        // 3. Combine the found text to create "Context"
-        const context = relevantDocs.map(d => d.page_content).join("\n\n");
+        // 1. Try to get context, but don't crash if Pinecone is empty
+        try {
+            const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
+                pineconeIndex,
+                namespace: "default-namespace", 
+            });
 
-        // 4. Create a prompt that forces the AI to use the PDF data
-        const prompt = `
-            You are an expert Research Assistant. 
-            Use the following context from the uploaded research paper to answer the question.
-            If the answer isn't in the context, say you don't know based on the paper.
-            
-            Context: ${context}
-            Question: ${question}
-            Answer:
-        `;
-
-        // 5. Stream the answer word-by-word to the frontend
-        const stream = await model.stream(prompt);
-
-        for await (const chunk of stream) {
-            // We emit each small "token" (word/part of word) as it's generated
-            socket.emit('ai-token', { text: chunk.content });
+            const relevantDocs = await vectorStore.similaritySearch(cleanQuestion, 2);
+            context = relevantDocs.map(d => d.page_content).join("\n\n");
+        } catch (pinerror) {
+            console.log("⚠️ Pinecone is empty or namespace doesn't exist yet. Using general knowledge.");
+            context = "No research papers found in the library yet.";
         }
 
-        // Tell the frontend the message is finished
+        // 2. Format the messages strictly for Gemini
+        const messages = [
+            new SystemMessage(`You are an expert Research Assistant. 
+            Context from papers: ${context}`),
+            new HumanMessage(cleanQuestion),
+        ];
+
+        // 3. Stream the response
+        const stream = await model.stream(messages);
+
+        for await (const chunk of stream) {
+            if (chunk?.content) {
+                socket.emit('ai-token', { text: chunk.content });
+            }
+        }
+
         socket.emit('ai-response-end');
 
     } catch (error) {
-        console.error("Chat Error:", error);
-        socket.emit('error', { message: "AI failed to process that question." });
+        // This is what triggers your "AI processing error" in the console
+        console.error("❌ Actual Backend Error:", error); 
+        socket.emit('error', { message: `AI Error: ${error.message}` });
     }
 };
